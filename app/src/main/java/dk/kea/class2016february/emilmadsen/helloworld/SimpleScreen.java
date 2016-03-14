@@ -9,7 +9,7 @@ import java.util.Random;
 
 public class SimpleScreen extends Screen
 {
-    Bitmap bitmap;
+    Bitmap bob;
     int x = 0;
     int y = 0;
     Random rand = new Random();
@@ -18,7 +18,7 @@ public class SimpleScreen extends Screen
     public SimpleScreen(Game game)
     {
         super(game);
-        bitmap = game.loadBitmap("bob.png");
+        bob = game.loadBitmap("bob.png");
     }
 
     @Override
@@ -26,6 +26,8 @@ public class SimpleScreen extends Screen
     {
         game.clearFramebuffer(clearColor);
 
+
+/*
         for(int pointer = 0; pointer < 5; pointer++)
         {
             if(game.isTouchDown(pointer))
@@ -33,6 +35,12 @@ public class SimpleScreen extends Screen
                 game.drawBitmap(bitmap, game.getTouchX(pointer),game.getTouchY(pointer));
             }
         }
+*/
+        float x = -game.getAccelerometer()[0];
+        float y = game.getAccelerometer()[1];
+        x = (x/5) * game.getVirtualScreenWidth()/2 + game.getVirtualScreenWidth()/2;
+        y = (y/5) * game.getVirtualScreenHeight()/2 + game.getVirtualScreenHeight()/2;
+        game.drawBitmap(bob, (int)x-64, (int)y-64);
     }
 
     @Override

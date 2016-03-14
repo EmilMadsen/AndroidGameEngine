@@ -1,11 +1,15 @@
 package dk.kea.class2016february.emilmadsen.helloworld;
 
 import android.app.Activity;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Rect;
-import android.os.Build;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -20,7 +24,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class Game extends Activity implements Runnable, View.OnKeyListener, TouchHandler
+public abstract class Game extends Activity implements Runnable, View.OnKeyListener, TouchHandler, SensorEventListener
 {
     private Thread mainLoopThread;
     private State state = State.Paused;
@@ -34,10 +38,20 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
     private Rect dst = new Rect();
     private boolean[] pressedKeys = new boolean[256];
 
+    private KeyEventPool keyEventPool = new KeyEventPool();
+    private List<MyKeyEvent> keyEvents = new ArrayList<>();
+    private List<MyKeyEvent> keyEventBuffer = new ArrayList<>();
+
     private TouchHandler touchHandler;
     private TouchEventPool touchEventPool = new TouchEventPool();
     private List<TouchEvent> touchEvents = new ArrayList<>();
     private List<TouchEvent> touchEventBuffer = new ArrayList<>();
+
+    private float[] accelerometer = new float[3];
+
+
+
+    // end of global variables, and start of methods
 
     public abstract Screen createStartScreen();
 
@@ -66,6 +80,12 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
         surfaceView.requestFocus();
         surfaceView.setOnKeyListener(this);
         touchHandler = new MultiTouchHandler(surfaceView, touchEventBuffer, touchEventPool);
+        SensorManager manager = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
+        if(manager.getSensorList(Sensor.TYPE_ACCELEROMETER).size() != 0)
+        {
+            Sensor accelerometer = manager.getSensorList(Sensor.TYPE_ACCELEROMETER).get(0);
+            manager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME);
+        }
     }
 
     public void setVirtualSurface(int width, int height)
@@ -139,6 +159,9 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
         return surfaceView.getHeight();
     }
 
+    public int getVirtualScreenWidth(){return virtualSurface.getWidth();}   // Nasty
+    public int getVirtualScreenHeight(){return virtualSurface.getHeight();} // Nasty
+
     public void drawBitmap(Bitmap bitmap, int x, int y)
     {
         if(canvas != null) canvas.drawBitmap(bitmap, x, y, null);
@@ -202,14 +225,48 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
         return y;
     }
 
-//    public List<KeyEvent> getKeyEvents()
+    public void fillEvents()
+    {
+        synchronized (keyEventBuffer)
+        {
+            int stop = keyEventBuffer.size();
+            for(int i = 0; i < stop; i++)
+            {
+                keyEvents.add(keyEventBuffer.get(i));
+            }
+            keyEventBuffer.clear();
+        }
+    }
+    private void freeEvents()
+    {
+        synchronized (keyEvents)
+        {
+            int stop = keyEvents.size();
+            for(int i = 0; i < stop; i++)
+            {
+                keyEventPool.free(keyEvents.get(i));
+            }
+        }
+    }
+
+//    public List<MyKeyEvent> getKeyEvents()
 //    {
 //        return null;
 //    }
 
     public float[] getAccelerometer()
     {
-        return null;
+        return accelerometer;
+    }
+
+    public void onAccuracyChanged(Sensor sensor, int accuracy)
+    {
+
+    }
+
+    public void onSensorChanged(SensorEvent event)
+    {
+        System.arraycopy(event.values, 0, accelerometer, 0, 3);
     }
 
     // This is the main method for the game loooop
@@ -273,6 +330,7 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
             if(isFinishing())
             {
                 stateChanges.add(stateChanges.size(), State.Disposed);
+                ((SensorManager)getSystemService(Context.SENSOR_SERVICE)).unregisterListener(this);
             }
             else
             {
