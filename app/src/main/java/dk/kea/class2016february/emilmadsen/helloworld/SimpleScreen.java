@@ -3,22 +3,26 @@ package dk.kea.class2016february.emilmadsen.helloworld;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.util.Log;
-import android.view.KeyEvent;
 
 import java.util.Random;
 
 public class SimpleScreen extends Screen
 {
     Bitmap bob;
-    int x = 0;
-    int y = 0;
+    float x = 0;
+    float y = 0;
     Random rand = new Random();
-    int clearColor = Color.MAGENTA;
+    int clearColor = Color.rgb(240,79,45);
+    Sound sound;
+    Music music;
+    boolean userWantsMusic = false;
 
     public SimpleScreen(Game game)
     {
         super(game);
         bob = game.loadBitmap("bob.png");
+        sound = game.loadSound("explosion.ogg");
+        music = game.loadMusic("music.ogg");
     }
 
     @Override
@@ -26,32 +30,56 @@ public class SimpleScreen extends Screen
     {
         game.clearFramebuffer(clearColor);
 
+        x = x + 100 * deltaTime;
+        y = y + 50 * deltaTime;
+        if(x > game.getVirtualScreenWidth()) x = -128;
+        if(y > game.getVirtualScreenHeight()) y = -128;
+        game.drawBitmap(bob, (int)x, (int)y);
 
-/*
-        for(int pointer = 0; pointer < 5; pointer++)
+        Log.d("Framerate","fps: " + game.getFrameRate() + "=============");
+
+        if(game.isTouchDown(0))
         {
-            if(game.isTouchDown(pointer))
+            if(userWantsMusic)
             {
-                game.drawBitmap(bitmap, game.getTouchX(pointer),game.getTouchY(pointer));
+                music.pause();
+                userWantsMusic = false;
+            }
+            else
+            {
+                music.play();
+                userWantsMusic = true;
             }
         }
-*/
-        float x = -game.getAccelerometer()[0];
-        float y = game.getAccelerometer()[1];
-        x = (x/5) * game.getVirtualScreenWidth()/2 + game.getVirtualScreenWidth()/2;
-        y = (y/5) * game.getVirtualScreenHeight()/2 + game.getVirtualScreenHeight()/2;
-        game.drawBitmap(bob, (int)x-64, (int)y-64);
+
+
+//        for(int pointer = 0; pointer < 5; pointer++)
+//        {
+//            if(game.isTouchDown(pointer))
+//            {
+//                game.drawBitmap(bob, game.getTouchX(pointer),game.getTouchY(pointer));
+//                sound.play(1);
+//            }
+//        }
+
+//        float x = -game.getAccelerometer()[0];
+//        float y = game.getAccelerometer()[1];
+//        x = (x/10) * game.getVirtualScreenWidth()/2 + game.getVirtualScreenWidth()/2;
+//        y = (y/10) * game.getVirtualScreenHeight()/2 + game.getVirtualScreenHeight()/2;
+//        game.drawBitmap(bob, (int)x-64, (int)y-64);
     }
 
     @Override
     public void pause()
     {
+        music.pause();
         Log.d("SimpleScreen","we are pausing");
     }
 
     @Override
     public void resume()
     {
+        if(userWantsMusic) music.play();
         Log.d("SimpleScreen","we are resuming");
     }
 
@@ -59,5 +87,6 @@ public class SimpleScreen extends Screen
     public void dispose()
     {
         Log.d("SimpleScreen","we are disposing");
+        sound.dispose();
     }
 }

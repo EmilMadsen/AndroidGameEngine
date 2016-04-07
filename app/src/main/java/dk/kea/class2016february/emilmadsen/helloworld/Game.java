@@ -2,6 +2,7 @@ package dk.kea.class2016february.emilmadsen.helloworld;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -10,6 +11,8 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.AudioManager;
+import android.media.SoundPool;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -49,6 +52,10 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
 
     private float[] accelerometer = new float[3];
 
+    private SoundPool soundPool;
+
+    private int framesPerSecond = -1;
+
 
 
     // end of global variables, and start of methods
@@ -66,6 +73,8 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
         surfaceView = new SurfaceView(this);
         setContentView(surfaceView);
         surfaceHolder = surfaceView.getHolder();
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
+        this.soundPool = new SoundPool(20, AudioManager.STREAM_MUSIC, 0);
         screen = createStartScreen();
         if(surfaceView.getWidth() > surfaceView.getHeight())
         {
@@ -133,16 +142,34 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
         }
     }
 
- /*   public Music loadMusic(String fileName)
+    public Music loadMusic(String fileName)
     {
-        return null;
+        try
+        {
+            AssetFileDescriptor assetFileDescriptor = getAssets().openFd(fileName);
+            return new Music(assetFileDescriptor);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Could not load music file: " + fileName);
+        }
     }
 
     public Sound loadSound(String fileName)
     {
-        return null;
+        try
+        {
+            AssetFileDescriptor assetFileDescriptor = getAssets().openFd(fileName);
+            int soundId = soundPool.load(assetFileDescriptor, 0);
+            Sound sound = new Sound(soundPool, soundId);
+            return sound;
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Could not load sound file: " + fileName);
+        }
     }
- */
+
 
     public void clearFramebuffer(int color)
     {
@@ -236,6 +263,15 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
             }
             keyEventBuffer.clear();
         }
+        synchronized (touchEventBuffer)
+        {
+            int stop = touchEventBuffer.size();
+            for(int i = 0; i < stop; i++)
+            {
+                touchEvents.add(touchEventBuffer.get(i));
+            }
+            touchEventBuffer.clear();
+        }
     }
     private void freeEvents()
     {
@@ -247,12 +283,25 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
                 keyEventPool.free(keyEvents.get(i));
             }
         }
+        synchronized (touchEvents)
+        {
+            int stop = touchEvents.size();
+            for(int i = 0; i < stop; i++)
+            {
+                touchEventPool.free(touchEvents.get(i));
+            }
+        }
     }
 
-//    public List<MyKeyEvent> getKeyEvents()
-//    {
-//        return null;
-//    }
+    public List<MyKeyEvent> getKeyEvents()
+    {
+        return keyEvents;
+    }
+
+    public List<TouchEvent> getTouchEvents()
+    {
+        return touchEvents;
+    }
 
     public float[] getAccelerometer()
     {
@@ -269,9 +318,18 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
         System.arraycopy(event.values, 0, accelerometer, 0, 3);
     }
 
+    public int getFrameRate()
+    {
+        return framesPerSecond;
+    }
+
     // This is the main method for the game loooop
     public void run()
     {
+        int frames = 0;
+        long lastTime = System.nanoTime();
+        long startTime = lastTime;
+        long currentTime = lastTime;
         while(true)
         {
             synchronized (stateChanges)
@@ -304,7 +362,12 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
                 Canvas physicalCanvas = surfaceHolder.lockCanvas();
                 // here we should do some drawing on the screen
                 //canvas.drawColor(Color.BLUE);
-                if(screen != null)screen.update(0);
+                fillEvents();
+                currentTime = System.nanoTime();
+
+                if(screen != null)screen.update((currentTime-lastTime)/1000000000.0f);
+                lastTime = currentTime;
+                freeEvents();
 
                 src.left = 0;
                 src.top = 0;
@@ -318,6 +381,13 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
                 physicalCanvas.drawBitmap(virtualSurface, src, dst, null);
                 surfaceHolder.unlockCanvasAndPost(physicalCanvas);
                 //physicalCanvas = null;
+            }
+            frames = frames + 1;
+            if(System.nanoTime() - startTime > 1000000000)
+            {
+                framesPerSecond = frames;
+                frames = 0;
+                startTime = System.nanoTime();
             }
         }
     }
@@ -342,6 +412,11 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
             mainLoopThread.join();
         }
         catch (InterruptedException e){}
+        if(isFinishing())
+        {
+            soundPool.release();
+        }
+
     }
 
     public void onResume()
