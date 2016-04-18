@@ -6,7 +6,9 @@ import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.Typeface;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -55,6 +57,8 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
     private SoundPool soundPool;
 
     private int framesPerSecond = -1;
+
+    private Paint paint = new Paint();
 
 
 
@@ -110,6 +114,24 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
     {
         if(screen != null) screen.dispose();
         screen = newScreen;
+    }
+
+    public Typeface loadFont(String fileName)
+    {
+        Typeface font = Typeface.createFromAsset(getAssets(), fileName);
+        if (font == null)
+        {
+            throw new RuntimeException("Could not load font from assets " + fileName);
+        }
+        return font;
+    }
+
+    public void drawText(Typeface font, String text, int positionX, int positionY, int color, int size)
+    {
+        paint.setTypeface(font);
+        paint.setTextSize(size);
+        paint.setColor(color);
+        canvas.drawText(text,positionX,positionY+size, paint);
     }
 
     public Bitmap loadBitmap(String fileName)
@@ -282,6 +304,7 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
             {
                 keyEventPool.free(keyEvents.get(i));
             }
+            keyEvents.clear();
         }
         synchronized (touchEvents)
         {
@@ -290,7 +313,9 @@ public abstract class Game extends Activity implements Runnable, View.OnKeyListe
             {
                 touchEventPool.free(touchEvents.get(i));
             }
+            touchEvents.clear();
         }
+
     }
 
     public List<MyKeyEvent> getKeyEvents()
